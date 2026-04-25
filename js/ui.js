@@ -36,6 +36,35 @@ export function openModal(html, { onClose } = {}) {
   document.addEventListener('keydown', overlay._escHandler);
 }
 
+/**
+ * Opens a branded confirmation dialog.
+ * @param {{ title?: string, message: string, confirmLabel?: string }} options
+ * @returns {Promise<boolean>} resolves true if confirmed, false if cancelled
+ */
+export function confirmModal({ title = 'Are you sure?', message, confirmLabel = 'Delete' } = {}) {
+  return new Promise((resolve) => {
+    openModal(`
+      <div class="modal__header">
+        <h2 class="modal__title">${escapeHtml(title)}</h2>
+      </div>
+      <p style="font-size:0.95rem;margin-bottom:var(--space-lg)">${escapeHtml(message)}</p>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" id="confirm-cancel-btn">Close</button>
+        <button class="btn btn-danger" id="confirm-ok-btn">${escapeHtml(confirmLabel)}</button>
+      </div>
+    `);
+
+    document.getElementById('confirm-ok-btn').addEventListener('click', () => {
+      closeModal();
+      resolve(true);
+    });
+    document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+      closeModal();
+      resolve(false);
+    });
+  });
+}
+
 export function closeModal(callback) {
   overlay.classList.add('hidden');
   modalEl.innerHTML = '';
@@ -100,22 +129,22 @@ export function getCategoryLabel(collection) {
 // ── Format pill renderer ──────────────────────────────────────
 
 /**
- * Renders a group of radio pill buttons for format selection.
+ * Renders a group of checkbox pill buttons for format selection.
  * @param {'movies'|'music'} category
- * @param {string} [selected]  currently selected value
+ * @param {string[]} [selected]  currently selected values (always an array)
  */
-export function renderFormatSelector(category, selected = '') {
+export function renderFormatSelector(category, selected = []) {
   const options = FORMAT_OPTIONS[category] ?? [];
   if (!options.length) return '';
 
   const pills = options.map(({ value, label }) => `
     <input
       class="format-option"
-      type="radio"
+      type="checkbox"
       name="mediaFormat"
       id="fmt-${value}"
       value="${value}"
-      ${value === selected ? 'checked' : ''}
+      ${selected.includes(value) ? 'checked' : ''}
     >
     <label for="fmt-${value}">${label}</label>
   `).join('');

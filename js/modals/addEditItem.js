@@ -24,6 +24,8 @@ function _openModal(collectionId, itemId) {
   const isEdit   = !!item;
   const category = collection.category;
 
+  const modalAbort = new AbortController();
+
   openModal(`
     <div class="modal__header">
       <h2 class="modal__title">${isEdit ? 'Edit Item' : 'Add Item'}</h2>
@@ -34,18 +36,15 @@ function _openModal(collectionId, itemId) {
       ${category !== 'custom' ? `
       <div class="form-group">
         <label class="form-label" for="item-search">Search</label>
-        <div class="search-row">
-          <div class="search-wrapper">
-            <input
-              class="form-input"
-              id="item-search"
-              type="search"
-              placeholder="${category === 'movies' ? 'Search movies…' : 'Search albums or artists…'}"
-              autocomplete="off"
-            >
-            <div class="search-results hidden" id="search-results"></div>
-          </div>
-          <button type="submit" class="btn btn-gradient">${isEdit ? 'Save Changes' : 'Add Item'}</button>
+        <div class="search-wrapper">
+          <input
+            class="form-input"
+            id="item-search"
+            type="search"
+            placeholder="${category === 'movies' ? 'Search movies…' : 'Search albums or artists…'}"
+            autocomplete="off"
+          >
+          <div class="search-results hidden" id="search-results"></div>
         </div>
       </div>
       <hr class="divider">
@@ -67,7 +66,7 @@ function _openModal(collectionId, itemId) {
       ${category === 'movies' ? renderMovieFields(item) : ''}
       ${category === 'music'  ? renderMusicFields(item)  : ''}
 
-      ${renderFormatSelector(category, item?.mediaFormat ?? '')}
+      ${renderFormatSelector(category, item?.mediaFormat ?? [])}
 
       <div class="form-group">
         <label class="form-label" for="item-notes">Notes</label>
@@ -76,10 +75,10 @@ function _openModal(collectionId, itemId) {
 
       <div class="modal__footer">
         <button type="button" class="btn btn-ghost" data-close-modal>Close</button>
-        ${category === 'custom' ? `<button type="submit" class="btn btn-gradient">${isEdit ? 'Save Changes' : 'Add Item'}</button>` : ''}
+        <button type="submit" class="btn btn-gradient">${isEdit ? 'Save Changes' : 'Add Item'}</button>
       </div>
     </form>
-  `);
+  `, { onClose: () => modalAbort.abort() });
 
   // ── Search wiring ─────────────────────────────────────────
   if (category !== 'custom') {
@@ -89,15 +88,32 @@ function _openModal(collectionId, itemId) {
     searchInput?.addEventListener('input', (e) => {
       const q = e.target.value;
       const handler = category === 'movies' ? searchMoviesDebounced : searchMusicDebounced;
-      handler(q, (results) => renderSearchResults(results, category, searchResults), () => {});
+      handler(q, (results) => {
+        renderSearchResults(results, category, searchResults);
+        // For music, lazily load cover art into each placeholder
+        if (category === 'music') {
+          searchResults.querySelectorAll('.result-cover-placeholder[data-mbid]').forEach(async (el) => {
+            const mbid = el.dataset.mbid;
+            if (!mbid) return;
+            const coverUrl = await fetchCoverArt(mbid);
+            if (coverUrl && el.isConnected) {
+              const img = document.createElement('img');
+              img.src = coverUrl;
+              img.alt = '';
+              img.style.cssText = 'width:36px;height:54px;object-fit:cover;border-radius:4px;flex-shrink:0';
+              el.replaceWith(img);
+            }
+          });
+        }
+      }, () => {});
     });
 
-    // Hide results on outside click
+    // Hide results on outside click — listener removed automatically when modal closes
     document.addEventListener('click', (e) => {
       if (!searchResults?.contains(e.target) && e.target !== searchInput) {
         searchResults?.classList.add('hidden');
       }
-    }, { once: false, capture: false });
+    }, { signal: modalAbort.signal });
   }
 
   // ── Form submit ───────────────────────────────────────────
@@ -116,6 +132,7 @@ function _openModal(collectionId, itemId) {
       createItem(fields);
       showToast(`"${fields.title}" added`);
     }
+    modalAbort.abort();
     closeModal();
     refreshCollection();
   });
@@ -127,7 +144,7 @@ function renderMovieFields(item) {
   return `
     <div class="form-group">
       <label class="form-label" for="item-year">Year</label>
-      <input class="form-input" id="item-year" type="number" min="1888" max="2099"
+      <input class="form-input" id="item-year" type="text" inputmode="numeric" min="1888" max="2099"
         placeholder="e.g. 1994" value="${escapeHtml(String(item?.year ?? ''))}">
     </div>
     <div class="form-group">
@@ -151,7 +168,7 @@ function renderMusicFields(item) {
     </div>
     <div class="form-group">
       <label class="form-label" for="item-year">Year</label>
-      <input class="form-input" id="item-year" type="number" min="1877" max="2099"
+      <input class="form-input" id="item-year" type="text" inputmode="numeric" min="1877" max="2099"
         placeholder="e.g. 1991" value="${escapeHtml(String(item?.year ?? ''))}">
     </div>
     <div class="form-group">
@@ -177,7 +194,7 @@ function renderSearchResults(results, category, container) {
     <div class="search-result-item" data-index="${i}">
       ${r.coverUrl
         ? `<img src="${escapeHtml(r.coverUrl)}" alt="" loading="lazy">`
-        : `<div style="width:36px;height:54px;background:var(--color-bg-surface);border-radius:4px;flex-shrink:0"></div>`
+        : `<div class="result-cover-placeholder" data-mbid="${escapeHtml(r.mbid ?? '')}" style="width:36px;height:54px;background:var(--color-bg-elevated);border-radius:4px;flex-shrink:0"></div>`
       }
       <div class="search-result-item__info">
         <div class="search-result-item__title">${escapeHtml(r.title)}</div>
@@ -256,7 +273,7 @@ function gatherFields(form, collectionId, category, existingItem) {
   const base = {
     collectionId,
     title:       val('item-title'),
-    mediaFormat: form.querySelector('input[name="mediaFormat"]:checked')?.value ?? '',
+    mediaFormat: [...form.querySelectorAll('input[name="mediaFormat"]:checked')].map(el => el.value),
     notes:       val('item-notes'),
     coverUrl:    form.querySelector('#item-cover-url-hidden')?.value || existingItem?.coverUrl || '',
   };

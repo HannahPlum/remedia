@@ -38,12 +38,6 @@ export function navigate(name, params = {}) {
 }
 
 // Update the header action button per view
-function updateChrome(name) {
-  if (name === 'home') {
-    headerBtn.textContent = '+ New Collection';
-    headerBtn.dataset.action = 'new-collection';
-    headerBtn.classList.remove('hidden');
-  } else if (name === 'collection') {
-    headerBtn.classList.add('hidden');
-  }
+function updateChrome() {
+  headerBtn.classList.add('hidden');
 }

@@ -65,12 +65,21 @@ export function deleteCollection(id) {
 
 // ── Items ─────────────────────────────────────────────────────
 
+// Ensures mediaFormat is always an array regardless of how old items were stored
+function normalizeItem(item) {
+  if (!item) return null;
+  if (!Array.isArray(item.mediaFormat)) {
+    return { ...item, mediaFormat: item.mediaFormat ? [item.mediaFormat] : [] };
+  }
+  return item;
+}
+
 export function getItems(collectionId) {
-  return load().items.filter(i => i.collectionId === collectionId);
+  return load().items.filter(i => i.collectionId === collectionId).map(normalizeItem);
 }
 
 export function getItem(id) {
-  return load().items.find(i => i.id === id) ?? null;
+  return normalizeItem(load().items.find(i => i.id === id) ?? null);
 }
 
 export function createItem(fields) {

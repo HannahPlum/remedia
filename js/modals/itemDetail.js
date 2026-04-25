@@ -2,7 +2,7 @@
 // Read-only item detail modal with Edit and Delete actions.
 
 import { getItem, deleteItem } from '../store.js';
-import { openModal, closeModal, showToast, CATEGORY_ICONS, escapeHtml } from '../ui.js';
+import { openModal, closeModal, confirmModal, showToast, CATEGORY_ICONS, escapeHtml } from '../ui.js';
 import { openEditItemModal } from './addEditItem.js';
 
 export function openItemDetailModal(itemId, collection, onChanged) {
@@ -26,7 +26,7 @@ export function openItemDetailModal(itemId, collection, onChanged) {
                        justify-content:center;font-size:3rem;flex-shrink:0">${icon}</div>`
       }
       <div style="flex:1;min-width:0">
-        ${detailRow('Format', item.mediaFormat)}
+        ${detailRow('Format', item.mediaFormat.join(', '))}
         ${detailRow('Year',   item.year)}
         ${collection.category === 'movies' ? `
           ${detailRow('Director', item.director)}
@@ -62,10 +62,14 @@ export function openItemDetailModal(itemId, collection, onChanged) {
     openEditItemModal(item.id, collection.id);
   });
 
-  document.getElementById('detail-delete-btn').addEventListener('click', () => {
-    if (!confirm(`Delete "${item.title}"?`)) return;
+  document.getElementById('detail-delete-btn').addEventListener('click', async () => {
+    const ok = await confirmModal({
+      title:        'Delete Item',
+      message:      `Remove "${item.title}" from your collection? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     deleteItem(item.id);
-    closeModal();
     showToast(`"${item.title}" deleted`);
     if (onChanged) onChanged();
   });
