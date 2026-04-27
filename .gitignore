@@ -16,3 +16,6 @@ Thumbs.db
 
 .vercel
 .env*.local
+
+# Local session transcripts
+session*.txt

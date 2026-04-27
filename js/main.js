@@ -24,5 +24,10 @@ document.getElementById('header-action-btn').addEventListener('click', (e) => {
   }
 });
 
+document.getElementById('site-logo-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  navigate('home');
+});
+
 // Boot
 navigate('home');

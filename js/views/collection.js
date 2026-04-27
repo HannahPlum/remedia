@@ -9,12 +9,15 @@ import {
 } from '../ui.js';
 
 let currentCollectionId = null;
+let currentAccent = null;
 let renderAbortController = null;
 
 export function mountCollection(container, { collectionId }) {
   currentCollectionId = collectionId;
   const collection = getCollection(collectionId);
   if (!collection) { navigate('home'); return; }
+  const colIndex = getCollections().findIndex(c => c.id === collectionId);
+  currentAccent = getAccentColor(colIndex);
   render(container, collection);
 }
 
@@ -52,8 +55,8 @@ function render(container, collection) {
   const activeSortLabel = prevSort === 'addedAt' ? 'Sort By' : (SORT_OPTIONS.find(o => o.value === prevSort)?.label ?? 'Sort By');
 
   container.innerHTML = `
-    <button class="back-btn" id="back-btn">&#9664;&#9664;</button>
     <div class="view-title-row">
+      <button class="back-btn" id="back-btn">&#9664;&#9664;</button>
       <h2 class="view-heading">${escapeHtml(collection.name)}</h2>
       <div class="toolbar-right">
         ${allItems.length > 0 ? `<button class="btn btn-red" id="toolbar-add-btn">+ Add Item</button>` : ''}
@@ -185,11 +188,16 @@ function renderGrid(container, collection, allItems, accent = '#e85d04') {
   if (search)             items = items.filter(i => i.title?.toLowerCase().includes(search));
   if (activeChips.length) items = items.filter(i => activeChips.some(chip => i.mediaFormat.includes(chip)));
 
-  items.sort((a, b) => {
-    if (sort === 'title')   return (a.title ?? '').localeCompare(b.title ?? '');
-    if (sort === 'year')    return (b.year ?? 0) - (a.year ?? 0);
-    return new Date(b.addedAt) - new Date(a.addedAt); // addedAt default
-  });
+  if (sort === 'addedAt') {
+    const ts = new Map(items.map(i => [i.id, Date.parse(i.addedAt)]));
+    items.sort((a, b) => ts.get(b.id) - ts.get(a.id));
+  } else {
+    items.sort((a, b) => {
+      if (sort === 'title') return (a.title ?? '').localeCompare(b.title ?? '');
+      if (sort === 'year')  return (b.year ?? 0) - (a.year ?? 0);
+      return 0;
+    });
+  }
 
   const grid = container.querySelector('#item-grid');
   const icon = CATEGORY_ICONS[collection.category] ?? '📦';
