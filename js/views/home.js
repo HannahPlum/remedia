@@ -30,7 +30,7 @@ function render(container) {
   container.innerHTML = `
     <div class="view-title-row">
       <h2 class="view-heading">Your Collections</h2>
-      <button class="btn btn-primary" id="new-collection-btn">+ New Collection</button>
+      <div class="toolbar-right"><button class="btn btn-primary" id="new-collection-btn">+ New Collection</button></div>
     </div>
     <div class="card-grid" id="collection-grid"></div>
   `;
